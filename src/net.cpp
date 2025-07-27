@@ -1472,6 +1472,9 @@ void ThreadMapPort()
         std::string strDesc = "Dogecoin " + FormatFullVersion();
 
         try {
+            int nFailureCount = 0;
+            const int MAX_UPNP_FAILURES = 10; // Maximum consecutive failures before giving up
+            
             while (true) {
 #ifndef UPNPDISCOVER_SUCCESS
                 /* miniupnpc 1.5 */
@@ -1483,11 +1486,18 @@ void ThreadMapPort()
                                     port.c_str(), port.c_str(), lanaddr, strDesc.c_str(), "TCP", 0, "0");
 #endif
 
-                if(r!=UPNPCOMMAND_SUCCESS)
+                if(r!=UPNPCOMMAND_SUCCESS) {
                     LogPrintf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
                         port, port, lanaddr, r, strupnperror(r));
-                else
+                    nFailureCount++;
+                    if (nFailureCount >= MAX_UPNP_FAILURES) {
+                        LogPrintf("UPnP: Too many consecutive failures (%d), giving up port mapping\n", nFailureCount);
+                        break;
+                    }
+                } else {
                     LogPrintf("UPnP Port Mapping successful.\n");
+                    nFailureCount = 0; // Reset failure count on success
+                }
 
                 MilliSleep(20*60*1000); // Refresh every 20 minutes
             }
